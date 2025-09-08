@@ -110,9 +110,9 @@ jobs:
         echo "Updating CI workflow references..."
         
         # Update version in CI workflows
-        sed -i "s/OpenZeppelin\/openzeppelin-contracts@v[0-9]\+\.[0-9]\+\.[0-9]\+/OpenZeppelin\/openzeppelin-contracts@${{ env.LATEST_OZ_VERSION }}/g" .github/workflows/ci.yml
-        sed -i "s/OpenZeppelin\/openzeppelin-contracts@v[0-9]\+\.[0-9]\+\.[0-9]\+/OpenZeppelin\/openzeppelin-contracts@${{ env.LATEST_OZ_VERSION }}/g" .github/workflows/security.yml
-        sed -i "s/OpenZeppelin\/openzeppelin-contracts@v[0-9]\+\.[0-9]\+\.[0-9]\+/OpenZeppelin\/openzeppelin-contracts@${{ env.LATEST_OZ_VERSION }}/g" .github/workflows/dependency-scan.yml
+        sed -i "s/OpenZeppelin\/openzeppelin-contracts@v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/OpenZeppelin\/openzeppelin-contracts@${{ env.LATEST_OZ_VERSION }}/g" .github/workflows/ci.yml
+        sed -i "s/OpenZeppelin\/openzeppelin-contracts@v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/OpenZeppelin\/openzeppelin-contracts@${{ env.LATEST_OZ_VERSION }}/g" .github/workflows/security.yml
+        sed -i "s/OpenZeppelin\/openzeppelin-contracts@v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/OpenZeppelin\/openzeppelin-contracts@${{ env.LATEST_OZ_VERSION }}/g" .github/workflows/dependency-scan.yml
         
         echo "✅ Updated CI workflow references"
 
