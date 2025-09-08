@@ -351,6 +351,35 @@ timeline
 
 ---
 
+## 🔄 CI/CD & Quality Assurance
+
+Our comprehensive CI/CD pipeline ensures code quality, security, and reliability:
+
+### 🛡️ **Security Scanning**
+- **Static Analysis**: Slither, Mythril security scanning
+- **Dependency Scanning**: Trivy vulnerability detection
+- **Code Analysis**: CodeQL security analysis
+- **Secret Detection**: TruffleHog pattern scanning
+
+### 🧪 **Testing & Coverage**
+- **Comprehensive Testing**: Unit, integration, and fuzz testing
+- **Coverage Reporting**: >95% coverage requirement with PR integration
+- **Gas Analysis**: Automated gas usage reporting
+- **Performance Testing**: Contract size and optimization checks
+
+### 🚀 **Automated Workflows**
+- **Continuous Integration**: Multi-environment testing on every PR
+- **Dependency Updates**: Weekly automated dependency management
+- **Deployment**: Staging and production deployment workflows
+- **Monitoring**: Real-time security and performance monitoring
+
+### 📊 **Quality Metrics**
+[![Build Status](https://github.com/kevanbtc/fthboss/workflows/fth-gold-ci/badge.svg)](https://github.com/kevanbtc/fthboss/actions)
+[![Security Scan](https://github.com/kevanbtc/fthboss/workflows/CodeQL%20Security%20Analysis/badge.svg)](https://github.com/kevanbtc/fthboss/actions)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/kevanbtc/fthboss/actions)
+
+---
+
 ## 🔗 Quick Navigation
 
 | 🎯 **Resource** | 🔗 **Link** | 📝 **Description** |
@@ -358,8 +387,11 @@ timeline
 | **🏗️ System Architecture** | [Technical Docs](smart-contracts/fth-gold/SYSTEM_OVERVIEW.md) | Complete technical specification |
 | **🔒 Security Analysis** | [Audit Report](smart-contracts/fth-gold/docs/SECURITY_AUDIT.md) | B+ security rating & recommendations |
 | **📊 Value Assessment** | [Business Analysis](smart-contracts/fth-gold/docs/VALUE_APPRAISAL.md) | A- economic rating & projections |
-| **⚡ Quick Start** | [Getting Started](smart-contracts/fth-gold/README.md) | Developer setup and testing guide |
+| **⚡ Quick Start** | [Getting Started](docs/tutorials/getting-started.md) | Developer setup and testing guide |
+| **📚 Documentation Hub** | [Docs Portal](docs/) | Comprehensive documentation center |
 | **📋 Smart Contracts** | [Contract Source](smart-contracts/fth-gold/contracts/) | Production-ready Solidity code |
+| **🤝 Contributing** | [Contribution Guide](CONTRIBUTING.md) | How to contribute to the project |
+| **🔒 Security Policy** | [Security Guidelines](SECURITY.md) | Vulnerability reporting and security practices |
 
 ---
 
