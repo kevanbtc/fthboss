@@ -1,0 +1,137 @@
+name: ❓ Question/Support
+description: Ask a question or get help with FTH-G
+title: "[QUESTION] "
+labels: ["question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about FTH-G? We're here to help! Please check our documentation first, then provide details about your question.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please check these items before asking
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I have checked the documentation and support guides
+          required: true
+        - label: This is not a bug report (use Bug Report template for bugs)
+          required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      description: What type of question is this?
+      options:
+        - General Usage
+        - Smart Contract Integration
+        - Development Setup
+        - API/Integration
+        - Security/Best Practices
+        - Business/Commercial
+        - Troubleshooting
+        - Architecture/Design
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: experience
+    attributes:
+      label: Experience Level
+      description: What's your experience level with FTH-G and blockchain?
+      options:
+        - Beginner (New to blockchain/DeFi)
+        - Intermediate (Some blockchain experience)
+        - Advanced (Experienced with smart contracts)
+        - Expert (Deep blockchain/DeFi knowledge)
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: |
+        Please be as specific as possible:
+        - What are you trying to accomplish?
+        - What specific aspect needs clarification?
+        - What have you already tried?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide context about your situation
+      placeholder: |
+        Help us understand your context:
+        - What project are you working on?
+        - What's your use case?
+        - What environment are you working in?
+        - Any constraints or requirements?
+
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What Have You Tried?
+      description: What solutions or approaches have you already attempted?
+      placeholder: |
+        Tell us what you've tried:
+        - Documentation you've read
+        - Code you've written
+        - Solutions you've attempted
+        - Where you got stuck
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Outcome
+      description: What result are you hoping to achieve?
+      placeholder: |
+        Describe what success looks like:
+        - What functionality you want to implement
+        - What behavior you expect
+        - What problem you're trying to solve
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Technical environment information (if relevant)
+      placeholder: |
+        If this is a technical question, provide:
+        - Operating system
+        - Development tools and versions
+        - Network (mainnet, testnet, local)
+        - Relevant contract addresses
+        - Programming language/framework
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency
+      description: How urgent is this question for you?
+      options:
+        - Low (General curiosity)
+        - Medium (Planning future work)
+        - High (Currently working on this)
+        - Critical (Blocking production work)
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Any other details that might be helpful
+      placeholder: |
+        Include any other relevant information:
+        - Links to related resources
+        - Screenshots or code snippets
+        - Error messages you've encountered
+        - Specific deadlines or constraints
