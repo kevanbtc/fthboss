@@ -1,0 +1,287 @@
+name: Dependency Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 8 * * *'  # Daily at 8 AM UTC
+
+jobs:
+  dependency-check:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+        exit-code: '0'  # Don't fail the build on vulnerabilities
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Trivy in JSON mode for artifact
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'json'
+        output: 'trivy-results.json'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+        exit-code: '0'
+
+    - name: Upload Trivy JSON results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: trivy-scan-results
+        path: trivy-results.json
+
+  npm-audit:
+    name: NPM Audit (if applicable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: hashFiles('package.json') != ''
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run npm audit
+      run: |
+        npm audit --audit-level=moderate --output=json > npm-audit-results.json || true
+        npm audit --audit-level=moderate
+
+    - name: Upload npm audit results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: npm-audit-results
+        path: npm-audit-results.json
+
+  foundry-dependency-check:
+    name: Foundry Dependency Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Check for outdated dependencies
+      working-directory: smart-contracts/fth-gold
+      run: |
+        echo "Checking Foundry dependencies..."
+        
+        # Install current dependencies
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+        
+        # List installed dependencies
+        echo "Currently installed dependencies:"
+        ls -la lib/ || echo "No lib directory found"
+        
+        # Check git submodule status
+        git submodule status || echo "No submodules found"
+        
+        # Verify critical dependencies
+        critical_deps=(
+          "lib/openzeppelin-contracts"
+        )
+        
+        for dep in "${critical_deps[@]}"; do
+          if [[ -d "$dep" ]]; then
+            echo "✅ Found critical dependency: $dep"
+            cd "$dep"
+            echo "Current commit: $(git rev-parse HEAD)"
+            echo "Latest tags:"
+            git tag --sort=-version:refname | head -5 || echo "No tags found"
+            cd - > /dev/null
+          else
+            echo "❌ Missing critical dependency: $dep"
+            exit 1
+          fi
+        done
+
+    - name: Create dependency report
+      working-directory: smart-contracts/fth-gold
+      run: |
+        echo "# Dependency Report" > dependency-report.md
+        echo "Generated on: $(date)" >> dependency-report.md
+        echo "" >> dependency-report.md
+        
+        if [[ -d lib ]]; then
+          echo "## Installed Dependencies" >> dependency-report.md
+          for dep in lib/*/; do
+            if [[ -d "$dep" ]]; then
+              dep_name=$(basename "$dep")
+              echo "### $dep_name" >> dependency-report.md
+              cd "$dep"
+              if git rev-parse --git-dir > /dev/null 2>&1; then
+                echo "- **Commit**: $(git rev-parse HEAD)" >> ../../dependency-report.md
+                echo "- **Date**: $(git log -1 --format=%ci)" >> ../../dependency-report.md
+                echo "- **Author**: $(git log -1 --format=%an)" >> ../../dependency-report.md
+              fi
+              cd - > /dev/null
+              echo "" >> dependency-report.md
+            fi
+          done
+        else
+          echo "No dependencies found." >> dependency-report.md
+        fi
+
+    - name: Upload dependency report
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-report
+        path: smart-contracts/fth-gold/dependency-report.md
+
+  license-check:
+    name: License Compatibility Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install license checker tools
+      run: |
+        npm install -g license-checker
+        pip install pip-licenses
+
+    - name: Check Foundry dependency licenses
+      working-directory: smart-contracts/fth-gold
+      run: |
+        echo "# License Compatibility Report" > license-report.md
+        echo "Generated on: $(date)" >> license-report.md
+        echo "" >> license-report.md
+        
+        echo "## Project License" >> license-report.md
+        echo "This project is licensed under: MIT" >> license-report.md
+        echo "" >> license-report.md
+        
+        echo "## Dependency Licenses" >> license-report.md
+        if [[ -d lib ]]; then
+          for dep in lib/*/; do
+            if [[ -d "$dep" ]]; then
+              dep_name=$(basename "$dep")
+              echo "### $dep_name" >> license-report.md
+              
+              # Look for license files
+              license_files=(
+                "$dep/LICENSE"
+                "$dep/LICENSE.txt" 
+                "$dep/LICENSE.md"
+                "$dep/COPYING"
+              )
+              
+              found_license=false
+              for license_file in "${license_files[@]}"; do
+                if [[ -f "$license_file" ]]; then
+                  echo "- **License File**: $(basename "$license_file")" >> license-report.md
+                  echo "- **Content Preview**: $(head -3 "$license_file" | tr '\n' ' ')" >> license-report.md
+                  found_license=true
+                  break
+                fi
+              done
+              
+              if [[ "$found_license" == false ]]; then
+                echo "- **License**: Not found" >> license-report.md
+              fi
+              
+              echo "" >> license-report.md
+            fi
+          done
+        else
+          echo "No dependencies to check." >> license-report.md
+        fi
+
+    - name: Upload license report
+      uses: actions/upload-artifact@v3
+      with:
+        name: license-report
+        path: smart-contracts/fth-gold/license-report.md
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for secret scanning
+
+    - name: Run TruffleHog secret scan
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+
+    - name: Run basic secret patterns check
+      run: |
+        echo "Running basic secret pattern checks..."
+        
+        # Common secret patterns to check for
+        patterns=(
+          "PRIVATE_KEY"
+          "SECRET_KEY"
+          "API_KEY"
+          "ACCESS_TOKEN"
+          "password\s*="
+          "secret\s*="
+          "key\s*="
+        )
+        
+        found_issues=false
+        for pattern in "${patterns[@]}"; do
+          if grep -ri "$pattern" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=lib; then
+            echo "⚠️  Found potential secret pattern: $pattern"
+            found_issues=true
+          fi
+        done
+        
+        if [[ "$found_issues" == false ]]; then
+          echo "✅ No obvious secret patterns found"
+        fi

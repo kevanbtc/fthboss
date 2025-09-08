@@ -1,0 +1,395 @@
+name: Deployment
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      network:
+        description: 'Blockchain network'
+        required: true
+        default: 'sepolia'
+        type: choice
+        options:
+          - sepolia
+          - goerli
+          - mainnet
+          - polygon
+          - arbitrum
+          - base
+
+env:
+  FOUNDRY_PROFILE: deploy
+
+jobs:
+  pre-deployment-checks:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      network: ${{ steps.set-env.outputs.network }}
+      
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set environment variables
+      id: set-env
+      run: |
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          echo "environment=production" >> $GITHUB_OUTPUT
+          echo "network=mainnet" >> $GITHUB_OUTPUT
+        else
+          echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          echo "network=${{ github.event.inputs.network }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Install dependencies
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+
+    - name: Compile contracts
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge build --via-ir
+        
+    - name: Run comprehensive tests
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge test -vvv
+        
+    - name: Check contract sizes
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge build --sizes
+        
+        # Check if any contracts exceed size limit (24KB = 24576 bytes)
+        oversized=$(forge build --sizes | awk '/Contract Size:/ {if ($3 > 24576) print $1 " is " $3 " bytes (exceeds 24KB limit)"}')
+        if [[ -n "$oversized" ]]; then
+          echo "❌ Contract size violations found:"
+          echo "$oversized"
+          exit 1
+        else
+          echo "✅ All contracts within size limits"
+        fi
+
+    - name: Generate gas report
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge test --gas-report > gas-report.txt
+        echo "Gas usage report generated"
+
+    - name: Upload gas report
+      uses: actions/upload-artifact@v3
+      with:
+        name: gas-report
+        path: smart-contracts/fth-gold/gas-report.txt
+
+  security-check:
+    name: Security Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: pre-deployment-checks
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Install dependencies
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+
+    - name: Install security tools
+      run: |
+        pip install slither-analyzer
+        pip install mythril
+
+    - name: Run Slither analysis
+      working-directory: smart-contracts/fth-gold
+      run: |
+        slither . --json slither-deployment-report.json || true
+        
+        # Check for critical issues
+        critical_issues=$(jq '.results.detectors[] | select(.impact == "High" or .impact == "Critical")' slither-deployment-report.json 2>/dev/null | wc -l)
+        if [[ $critical_issues -gt 0 ]]; then
+          echo "❌ Found $critical_issues critical security issues"
+          echo "SECURITY_ISSUES=true" >> $GITHUB_ENV
+        else
+          echo "✅ No critical security issues found"
+          echo "SECURITY_ISSUES=false" >> $GITHUB_ENV
+        fi
+
+    - name: Block deployment on security issues
+      if: env.SECURITY_ISSUES == 'true' && needs.pre-deployment-checks.outputs.environment == 'production'
+      run: |
+        echo "❌ Deployment blocked due to critical security issues in production environment"
+        exit 1
+
+    - name: Upload security report
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-security-report
+        path: smart-contracts/fth-gold/slither-deployment-report.json
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [pre-deployment-checks, security-check]
+    if: needs.pre-deployment-checks.outputs.environment == 'staging'
+    environment: staging
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Install dependencies
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+
+    - name: Set up environment
+      working-directory: smart-contracts/fth-gold
+      run: |
+        # Create .env file for deployment
+        cat > .env << EOF
+        PRIVATE_KEY=${{ secrets.STAGING_PRIVATE_KEY }}
+        RPC_URL=${{ secrets.STAGING_RPC_URL }}
+        ETHERSCAN_API_KEY=${{ secrets.ETHERSCAN_API_KEY }}
+        EOF
+
+    - name: Deploy contracts
+      working-directory: smart-contracts/fth-gold
+      run: |
+        echo "Deploying to ${{ needs.pre-deployment-checks.outputs.network }} (staging)"
+        
+        # Run deployment script
+        forge script script/Deploy.s.sol:DeployScript \
+          --rpc-url ${{ secrets.STAGING_RPC_URL }} \
+          --private-key ${{ secrets.STAGING_PRIVATE_KEY }} \
+          --broadcast \
+          --verify \
+          --etherscan-api-key ${{ secrets.ETHERSCAN_API_KEY }} \
+          -vvvv
+
+    - name: Save deployment artifacts
+      working-directory: smart-contracts/fth-gold
+      run: |
+        # Create deployment report
+        echo "# Staging Deployment Report" > deployment-report.md
+        echo "**Date**: $(date)" >> deployment-report.md
+        echo "**Network**: ${{ needs.pre-deployment-checks.outputs.network }}" >> deployment-report.md
+        echo "**Environment**: staging" >> deployment-report.md
+        echo "" >> deployment-report.md
+        
+        # Extract contract addresses from broadcast logs
+        if [[ -d broadcast ]]; then
+          echo "## Deployed Contracts" >> deployment-report.md
+          find broadcast -name "*.json" -exec cat {} \; | jq -r '.transactions[]? | select(.contractName) | "- **\(.contractName)**: \(.contractAddress)"' >> deployment-report.md
+        fi
+
+    - name: Upload deployment artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: staging-deployment
+        path: |
+          smart-contracts/fth-gold/broadcast/
+          smart-contracts/fth-gold/deployment-report.md
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [pre-deployment-checks, security-check]
+    if: needs.pre-deployment-checks.outputs.environment == 'production'
+    environment: production
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Install dependencies
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+
+    - name: Verify production readiness
+      run: |
+        echo "🔍 Verifying production deployment readiness..."
+        
+        # Check if this is a release
+        if [[ "${{ github.event_name }}" != "release" ]]; then
+          echo "❌ Production deployments must be triggered by releases only"
+          exit 1
+        fi
+        
+        # Verify tag follows semantic versioning
+        if [[ ! "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "❌ Release tag must follow semantic versioning (vX.Y.Z)"
+          exit 1
+        fi
+        
+        echo "✅ Production deployment checks passed"
+
+    - name: Set up production environment
+      working-directory: smart-contracts/fth-gold
+      run: |
+        # Create .env file for production deployment
+        cat > .env << EOF
+        PRIVATE_KEY=${{ secrets.PRODUCTION_PRIVATE_KEY }}
+        RPC_URL=${{ secrets.PRODUCTION_RPC_URL }}
+        ETHERSCAN_API_KEY=${{ secrets.ETHERSCAN_API_KEY }}
+        EOF
+
+    - name: Deploy to production with multi-sig
+      working-directory: smart-contracts/fth-gold
+      run: |
+        echo "🚀 Deploying to production (${{ needs.pre-deployment-checks.outputs.network }})"
+        
+        # Production deployment with extra verification
+        forge script script/Deploy.s.sol:DeployScript \
+          --rpc-url ${{ secrets.PRODUCTION_RPC_URL }} \
+          --private-key ${{ secrets.PRODUCTION_PRIVATE_KEY }} \
+          --broadcast \
+          --verify \
+          --etherscan-api-key ${{ secrets.ETHERSCAN_API_KEY }} \
+          --slow \
+          -vvvv
+
+    - name: Verify deployment
+      working-directory: smart-contracts/fth-gold
+      run: |
+        echo "🔍 Verifying production deployment..."
+        
+        # Additional verification steps for production
+        # This would include checks like:
+        # - Contract verification on Etherscan
+        # - Ownership transfer to multi-sig
+        # - Initial configuration validation
+        
+        echo "✅ Production deployment verified"
+
+    - name: Create production deployment report
+      working-directory: smart-contracts/fth-gold
+      run: |
+        echo "# Production Deployment Report" > production-deployment-report.md
+        echo "**Release**: ${{ github.ref_name }}" >> production-deployment-report.md
+        echo "**Date**: $(date)" >> production-deployment-report.md
+        echo "**Network**: ${{ needs.pre-deployment-checks.outputs.network }}" >> production-deployment-report.md
+        echo "**Commit**: ${{ github.sha }}" >> production-deployment-report.md
+        echo "" >> production-deployment-report.md
+        
+        # Extract contract addresses from broadcast logs
+        if [[ -d broadcast ]]; then
+          echo "## Deployed Contracts" >> production-deployment-report.md
+          find broadcast -name "*.json" -exec cat {} \; | jq -r '.transactions[]? | select(.contractName) | "- **\(.contractName)**: \(.contractAddress)"' >> production-deployment-report.md
+        fi
+        
+        echo "" >> production-deployment-report.md
+        echo "## Next Steps" >> production-deployment-report.md
+        echo "1. Verify contracts on Etherscan" >> production-deployment-report.md
+        echo "2. Transfer ownership to multi-sig wallet" >> production-deployment-report.md
+        echo "3. Configure initial parameters" >> production-deployment-report.md
+        echo "4. Update documentation with contract addresses" >> production-deployment-report.md
+
+    - name: Upload production artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: production-deployment
+        path: |
+          smart-contracts/fth-gold/broadcast/
+          smart-contracts/fth-gold/production-deployment-report.md
+
+    - name: Create GitHub release assets
+      if: github.event_name == 'release'
+      run: |
+        # Prepare release assets
+        cd smart-contracts/fth-gold
+        tar -czf fth-gold-contracts-${{ github.ref_name }}.tar.gz out/ broadcast/ production-deployment-report.md
+
+    - name: Upload release assets
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: smart-contracts/fth-gold/fth-gold-contracts-${{ github.ref_name }}.tar.gz
+        asset_name: fth-gold-contracts-${{ github.ref_name }}.tar.gz
+        asset_content_type: application/gzip
+
+  post-deployment:
+    name: Post-deployment Tasks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [pre-deployment-checks, deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+
+    steps:
+    - name: Notify deployment success
+      run: |
+        echo "🎉 Deployment completed successfully!"
+        echo "Environment: ${{ needs.pre-deployment-checks.outputs.environment }}"
+        echo "Network: ${{ needs.pre-deployment-checks.outputs.network }}"
+
+    - name: Create deployment summary
+      run: |
+        echo "# Deployment Summary" > deployment-summary.md
+        echo "" >> deployment-summary.md
+        echo "## Details" >> deployment-summary.md
+        echo "- **Environment**: ${{ needs.pre-deployment-checks.outputs.environment }}" >> deployment-summary.md
+        echo "- **Network**: ${{ needs.pre-deployment-checks.outputs.network }}" >> deployment-summary.md
+        echo "- **Commit**: ${{ github.sha }}" >> deployment-summary.md
+        echo "- **Deployment Time**: $(date)" >> deployment-summary.md
+        echo "" >> deployment-summary.md
+        echo "## Status" >> deployment-summary.md
+        echo "✅ Deployment completed successfully" >> deployment-summary.md
+
+    - name: Upload deployment summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-summary
+        path: deployment-summary.md

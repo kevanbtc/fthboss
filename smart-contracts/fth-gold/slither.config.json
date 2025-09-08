@@ -1,0 +1,77 @@
+# Slither Configuration
+
+This configuration file customizes Slither static analysis for the FTH-G smart contracts.
+
+## Basic Configuration
+
+```json
+{
+  "filter_paths": [
+    "lib/",
+    "node_modules/",
+    "test/"
+  ],
+  "exclude_dependencies": true,
+  "exclude_optimization": false,
+  "exclude_informational": false,
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "solc_remaps": [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+  ],
+  "disable_color": false,
+  "checkers_to_exclude": [
+    "pragma",
+    "solc-version",
+    "naming-convention"
+  ],
+  "checkers_to_run": "all"
+}
+```
+
+## Detector Configuration
+
+### High Priority Detectors
+- reentrancy-eth
+- reentrancy-no-eth
+- arbitrary-send
+- controlled-delegatecall
+- uninitialized-state
+- uninitialized-storage
+- uninitialized-local
+- unused-return
+
+### Medium Priority Detectors
+- timestamp
+- block-other-parameters
+- assembly
+- low-level-calls
+- missing-zero-check
+- reentrancy-events
+
+### Informational Detectors
+- pragma
+- solc-version
+- naming-convention
+- function-init-state
+- variable-scope
+
+## Custom Rules
+
+For FTH-G specific security patterns:
+
+### Oracle Security
+- Price staleness checks
+- Circuit breaker validations
+- Multiple oracle source verification
+
+### Access Control
+- Multi-signature requirements
+- Role-based access validation
+- Emergency pause mechanisms
+
+### Economic Security
+- Deficit accounting validation
+- Distribution calculation accuracy
+- Yield calculation verification

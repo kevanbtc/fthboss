@@ -1,0 +1,158 @@
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Mondays at 6 AM UTC
+
+jobs:
+  analyze:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+        # Add other languages as the project grows: 'python', 'go', 'java', etc.
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+        # Override auto-detection and specify query suites
+        queries: +security-and-quality
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v2
+      # If autobuild fails, you can replace it with custom build steps
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:${{matrix.language}}"
+
+  solidity-analysis:
+    name: Solidity Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Install dependencies
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+
+    - name: Install Slither
+      run: |
+        pip install slither-analyzer
+        pip install solc-select
+        solc-select install 0.8.19
+        solc-select use 0.8.19
+
+    - name: Run Slither Analysis
+      working-directory: smart-contracts/fth-gold
+      run: |
+        slither . \
+          --json slither-report.json \
+          --sarif slither-results.sarif \
+          --exclude-dependencies \
+          --filter-paths lib/ \
+          --checkers-list \
+          --print summary || true
+
+    - name: Upload Slither SARIF results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: smart-contracts/fth-gold/slither-results.sarif
+        category: "slither"
+
+    - name: Upload Slither JSON results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: slither-analysis
+        path: smart-contracts/fth-gold/slither-report.json
+
+  mythril-analysis:
+    name: Mythril Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Install dependencies
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+        forge build
+
+    - name: Install Mythril
+      run: |
+        pip install mythril
+
+    - name: Run Mythril Analysis on key contracts
+      working-directory: smart-contracts/fth-gold
+      run: |
+        # Create results directory
+        mkdir -p mythril-results
+        
+        # Analyze main contracts (limit scope to avoid timeouts)
+        key_contracts=(
+          "contracts/FTHG.sol"
+          "contracts/StakeLocker.sol"
+          "contracts/DistributionManager.sol"
+        )
+        
+        for contract in "${key_contracts[@]}"; do
+          if [[ -f "$contract" ]]; then
+            echo "Analyzing $contract..."
+            myth analyze "$contract" \
+              --solv 0.8.19 \
+              --execution-timeout 300 \
+              --output jsonv2 \
+              --outfile "mythril-results/$(basename $contract .sol).json" || true
+          fi
+        done
+
+    - name: Upload Mythril results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: mythril-analysis
+        path: smart-contracts/fth-gold/mythril-results/
