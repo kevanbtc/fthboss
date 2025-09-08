@@ -12,11 +12,16 @@ import {Parameters} from "../config/Parameters.sol";
 import {Errors} from "../utils/Errors.sol";
 
 contract StakeLocker is AccessControl {
-    struct Position { uint128 kg; uint64 start; uint64 unlock; bool converted; }
+    struct Position {
+        uint128 kg;
+        uint64 start;
+        uint64 unlock;
+        bool converted;
+    }
 
-    IERC20 public immutable USDT;  // 6-dec
+    IERC20 public immutable USDT; // 6-dec
     FTHStakeReceipt public immutable SR;
-    FTHG   public immutable FTH;
+    FTHG public immutable FTH;
     IOracleManager public immutable oracle;
     IKYCSBT public immutable sbt;
     ComplianceRegistry public immutable compliance;
@@ -30,25 +35,18 @@ contract StakeLocker is AccessControl {
     event Staked(address indexed user, uint256 kg, uint256 usdtPaid);
     event Converted(address indexed user, uint256 kg);
 
-    constructor(
-        IERC20 usdt, 
-        FTHStakeReceipt sr, 
-        FTHG fth, 
-        IOracleManager o, 
-        IKYCSBT s,
-        ComplianceRegistry comp
-    ) {
-        USDT = usdt; 
-        SR = sr; 
-        FTH = fth; 
-        oracle = o; 
+    constructor(IERC20 usdt, FTHStakeReceipt sr, FTHG fth, IOracleManager o, IKYCSBT s, ComplianceRegistry comp) {
+        USDT = usdt;
+        SR = sr;
+        FTH = fth;
+        oracle = o;
         sbt = s;
         compliance = comp;
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); 
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function pause(bool p) external onlyRole(DEFAULT_ADMIN_ROLE) { 
-        paused = p; 
+    function pause(bool p) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        paused = p;
     }
 
     /// @notice Stake exactly @ $20k/kg fixed price; mints non-transferable SR.
@@ -59,7 +57,7 @@ contract StakeLocker is AccessControl {
             revert Errors.NotEligible(msg.sender, compliance.MARKET_UAE_DMCC());
         }
         (uint256 cov, uint256 t) = oracle.coverageRatioBps();
-        _fresh(t); 
+        _fresh(t);
         _coverage(cov);
 
         Position storage p = positions[msg.sender];
@@ -86,7 +84,7 @@ contract StakeLocker is AccessControl {
         require(block.timestamp >= p.unlock, "locked");
 
         (uint256 cov, uint256 t) = oracle.coverageRatioBps();
-        _fresh(t); 
+        _fresh(t);
         _coverage(cov);
 
         p.converted = true;
@@ -96,12 +94,14 @@ contract StakeLocker is AccessControl {
     }
 
     function _fresh(uint256 updatedAt) internal view {
-        if (block.timestamp - updatedAt > Parameters.ORACLE_STALENESS_MAX)
+        if (block.timestamp - updatedAt > Parameters.ORACLE_STALENESS_MAX) {
             revert Errors.OracleStale(updatedAt, Parameters.ORACLE_STALENESS_MAX);
+        }
     }
 
     function _coverage(uint256 bps) internal pure {
-        if (bps < Parameters.MIN_COVERAGE_BPS) 
+        if (bps < Parameters.MIN_COVERAGE_BPS) {
             revert Errors.CoverageTooLow(bps, Parameters.MIN_COVERAGE_BPS);
+        }
     }
 }

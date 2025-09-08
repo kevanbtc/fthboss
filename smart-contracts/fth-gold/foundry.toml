@@ -1,8 +1,13 @@
 [profile.default]
-libs = ["../../lib"]
-auto_detect_remappings = false
-remappings = [
-  "@openzeppelin/contracts/=../../lib/openzeppelin-contracts/contracts/",
-  "openzeppelin-contracts/=../../lib/openzeppelin-contracts/",
-  "forge-std/=../../lib/forge-std/src/"
-]
+solc_version = "0.8.24"
+via_ir = true
+optimizer = true
+optimizer_runs = 500
+fs_permissions = [{ access = "read", path = "./" }]
+
+[profile.ci]
+solc_version = "0.8.24"
+via_ir = true
+optimizer = true
+optimizer_runs = 500
+deny_warnings = true

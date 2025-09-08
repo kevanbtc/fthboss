@@ -10,24 +10,28 @@ import {Parameters} from "../config/Parameters.sol";
 import {IERC20Mintable} from "../interfaces/IERC20Mintable.sol";
 
 contract DistributionManager is AccessControl {
-    struct Stream { uint128 principal; uint64 lastPaid; uint128 deficit; }
+    struct Stream {
+        uint128 principal;
+        uint64 lastPaid;
+        uint128 deficit;
+    }
 
-    IERC20 public immutable USDT;           // cash out
-    IERC20Mintable public immutable FTH;    // for principal view
+    IERC20 public immutable USDT; // cash out
+    IERC20Mintable public immutable FTH; // for principal view
     IOracleManager public immutable oracle;
 
     mapping(address => Stream) public streams;
-    uint64  public lastEpoch;     // last global tick
-    bool    public paused;
-    bool    public deficitAccounting = true; // ON by default
+    uint64 public lastEpoch; // last global tick
+    bool public paused;
+    bool public deficitAccounting = true; // ON by default
 
     bytes32 public constant FUNDER_ROLE = keccak256("FUNDER"); // ops wallet funds USDT here
 
     event Paid(address indexed user, uint256 target, uint256 paid, uint256 newDeficit);
 
     constructor(IERC20 usdt, IERC20Mintable fth, IOracleManager o) {
-        USDT = usdt; 
-        FTH = fth; 
+        USDT = usdt;
+        FTH = fth;
         oracle = o;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
@@ -41,8 +45,8 @@ contract DistributionManager is AccessControl {
     }
 
     /// @notice Fund the distributor with USDT.
-    function fund(uint256 amount) external onlyRole(FUNDER_ROLE) { 
-        USDT.transferFrom(msg.sender, address(this), amount); 
+    function fund(uint256 amount) external onlyRole(FUNDER_ROLE) {
+        USDT.transferFrom(msg.sender, address(this), amount);
     }
 
     /// @notice Pay out monthly policy (10%/mo). Partial pays become deficits if enabled.
@@ -51,10 +55,12 @@ contract DistributionManager is AccessControl {
 
         // oracle freshness + coverage gate
         (uint256 cov, uint256 t1) = oracle.coverageRatioBps();
-        if (block.timestamp - t1 > Parameters.ORACLE_STALENESS_MAX) 
+        if (block.timestamp - t1 > Parameters.ORACLE_STALENESS_MAX) {
             revert Errors.OracleStale(t1, Parameters.ORACLE_STALENESS_MAX);
-        if (cov < Parameters.MIN_COVERAGE_BPS) 
+        }
+        if (cov < Parameters.MIN_COVERAGE_BPS) {
             revert Errors.CoverageTooLow(cov, Parameters.MIN_COVERAGE_BPS);
+        }
 
         for (uint256 i = 0; i < users.length; i++) {
             Stream storage s = streams[users[i]];
@@ -67,8 +73,8 @@ contract DistributionManager is AccessControl {
             uint256 can = USDT.balanceOf(address(this));
             uint256 pay = can >= wantUSDT ? wantUSDT : (deficitAccounting ? can : 0);
 
-            if (pay > 0) { 
-                USDT.transfer(users[i], pay); 
+            if (pay > 0) {
+                USDT.transfer(users[i], pay);
             }
             if (deficitAccounting && pay < wantUSDT) {
                 s.deficit += uint128(wantUSDT - pay);

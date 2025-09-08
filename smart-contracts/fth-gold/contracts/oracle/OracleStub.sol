@@ -9,21 +9,21 @@ contract OracleStub is IOracleManager {
     uint256 public coverageBps = 13_000;
     uint256 public covUpdated = block.timestamp;
 
-    function setPrice(uint256 p) external { 
-        price = p; 
-        priceUpdated = block.timestamp; 
-    }
-    
-    function setCoverage(uint256 bps) external { 
-        coverageBps = bps; 
-        covUpdated = block.timestamp; 
+    function setPrice(uint256 p) external {
+        price = p;
+        priceUpdated = block.timestamp;
     }
 
-    function xauUsdPrice() external view returns (uint256, uint256) { 
-        return (price, priceUpdated); 
+    function setCoverage(uint256 bps) external {
+        coverageBps = bps;
+        covUpdated = block.timestamp;
     }
-    
-    function coverageRatioBps() external view returns (uint256, uint256) { 
-        return (coverageBps, covUpdated); 
+
+    function xauUsdPrice() external view returns (uint256, uint256) {
+        return (price, priceUpdated);
+    }
+
+    function coverageRatioBps() external view returns (uint256, uint256) {
+        return (coverageBps, covUpdated);
     }
 }

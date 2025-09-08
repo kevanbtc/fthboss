@@ -3,7 +3,7 @@
 **Audit Date**: September 7, 2025  
 **Auditor**: Claude Code AI Analysis  
 **Version**: v1.0  
-**Commit Hash**: a792b2c  
+**Commit Hash**: a792b2c
 
 ## Executive Summary
 
@@ -12,6 +12,7 @@ The FTH-G gold-backed token system has been analyzed for security vulnerabilitie
 ### Overall Security Rating: **B+ (85/100)**
 
 **Strengths**:
+
 - Robust access control with OpenZeppelin's AccessControl
 - Comprehensive circuit breakers for oracle and coverage failures
 - Non-transferable compliance tokens prevent regulatory bypass
@@ -19,6 +20,7 @@ The FTH-G gold-backed token system has been analyzed for security vulnerabilitie
 - Proper use of checks-effects-interactions pattern
 
 **Areas for Improvement**:
+
 - Oracle centralization risk requires multiple price feeds
 - Missing emergency pause coordination across contracts
 - Front-running vulnerabilities in redemption pricing
@@ -31,19 +33,22 @@ The FTH-G gold-backed token system has been analyzed for security vulnerabilitie
 **Severity**: ✅ **SECURE**
 
 **Analysis**:
+
 - Uses OpenZeppelin's battle-tested AccessControl pattern
 - Role-based permissions with DEFAULT_ADMIN_ROLE, MINTER_ROLE, BURNER_ROLE
 - Proper role grants in deployment script
 - Multi-signature admin recommended for production
 
 **Code Reference**: `contracts/token/FTHG.sol:15-17`
+
 ```solidity
-constructor() ERC20("FTH-Gold", "FTHG") { 
-    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); 
+constructor() ERC20("FTH-Gold", "FTHG") {
+    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 }
 ```
 
 **Recommendations**:
+
 - Transfer admin role to multi-sig after deployment
 - Consider timelock for critical parameter changes
 - Implement role renunciation safeguards
@@ -53,12 +58,14 @@ constructor() ERC20("FTH-Gold", "FTHG") {
 **Severity**: ⚠️ **MEDIUM RISK**
 
 **Analysis**:
+
 - Single oracle dependency creates central point of failure
 - Staleness checks implemented (24-hour maximum)
 - Coverage ratio guards prevent under-collateralized operations
 - No circuit breaker for extreme price deviations
 
 **Code Reference**: `contracts/staking/StakeLocker.sol:98-101`
+
 ```solidity
 function _fresh(uint256 updatedAt) internal view {
     if (block.timestamp - updatedAt > Parameters.ORACLE_STALENESS_MAX)
@@ -67,6 +74,7 @@ function _fresh(uint256 updatedAt) internal view {
 ```
 
 **Recommendations**:
+
 - Implement multiple oracle feeds with median pricing
 - Add price deviation circuit breakers (±10% per hour)
 - Consider Chainlink price feeds for production
@@ -77,18 +85,21 @@ function _fresh(uint256 updatedAt) internal view {
 **Severity**: ⚠️ **MEDIUM RISK**
 
 **Analysis**:
+
 - Fixed $20k/kg pricing eliminates oracle manipulation during staking
 - NAV-based redemptions create arbitrage opportunities
 - Daily budget throttling prevents bank runs
 - No slippage protection in ETH payment flows
 
 **Code Reference**: `contracts/desk/RedemptionDesk.sol:59-60`
+
 ```solidity
-if (spentTodayUSDT + net > dailyBudgetUSDT) 
+if (spentTodayUSDT + net > dailyBudgetUSDT)
     revert Errors.InsufficientBudget(net, dailyBudgetUSDT - spentTodayUSDT);
 ```
 
 **Recommendations**:
+
 - Implement graduated redemption fees during high volume
 - Add minimum holding periods for large positions
 - Consider Dutch auction mechanism for large redemptions
@@ -99,12 +110,14 @@ if (spentTodayUSDT + net > dailyBudgetUSDT)
 **Severity**: ✅ **SECURE**
 
 **Analysis**:
+
 - Soulbound KYC tokens prevent wallet hopping
 - Multi-jurisdiction compliance registry
 - Market-specific access controls
 - Expiry-based compliance validation
 
 **Code Reference**: `contracts/compliance/ComplianceRegistry.sol:70-76`
+
 ```solidity
 function isEligible(address user, bytes32 marketId) external view returns (bool) {
     if (!marketEnabled[marketId]) return false;
@@ -115,6 +128,7 @@ function isEligible(address user, bytes32 marketId) external view returns (bool)
 ```
 
 **Strengths**:
+
 - Comprehensive jurisdiction support (UAE, US, EU, CH, SG)
 - Granular investor class categorization
 - Time-based compliance expiry
@@ -125,12 +139,14 @@ function isEligible(address user, bytes32 marketId) external view returns (bool)
 **Severity**: ⚠️ **MEDIUM RISK**
 
 **Analysis**:
+
 - Follows checks-effects-interactions pattern
 - No explicit reentrancy guards on external calls
 - Front-running possible in redemption flows
 - MEV extraction possible in large transactions
 
 **Code Reference**: `contracts/staking/StakeLocker.sol:69-78`
+
 ```solidity
 require(USDT.transferFrom(msg.sender, address(this), cost), "USDT xfer fail");
 p.kg = uint128(kg);
@@ -141,6 +157,7 @@ totalKgStaked += kg;
 ```
 
 **Recommendations**:
+
 - Add ReentrancyGuard to all external-calling functions
 - Implement commit-reveal scheme for large transactions
 - Add private mempool support via Flashbots
@@ -151,19 +168,22 @@ totalKgStaked += kg;
 **Severity**: ⚠️ **MEDIUM RISK**
 
 **Analysis**:
+
 - Individual contract pause mechanisms
 - No coordinated emergency shutdown
 - Admin role concentration risk
 - No governance token for decentralization
 
 **Code Reference**: `contracts/staking/StakeLocker.sol:50-52`
+
 ```solidity
-function pause(bool p) external onlyRole(DEFAULT_ADMIN_ROLE) { 
-    paused = p; 
+function pause(bool p) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    paused = p;
 }
 ```
 
 **Recommendations**:
+
 - Implement system-wide emergency coordinator
 - Add timelocks for critical parameter changes
 - Distribute admin privileges across multiple addresses
@@ -174,12 +194,14 @@ function pause(bool p) external onlyRole(DEFAULT_ADMIN_ROLE) {
 **Severity**: ⚠️ **LOW RISK**
 
 **Analysis**:
+
 - Immutable contract pattern used throughout
 - No upgrade mechanisms implemented
 - Parameter updates require new deployments
 - Version control through contract replacement
 
 **Recommendations**:
+
 - Consider proxy patterns for critical contracts
 - Implement parameter update functions with timelocks
 - Add contract migration capabilities
@@ -188,6 +210,7 @@ function pause(bool p) external onlyRole(DEFAULT_ADMIN_ROLE) {
 ## Vulnerability Assessment
 
 ### High Severity Issues: 0
+
 No critical vulnerabilities identified.
 
 ### Medium Severity Issues: 3
@@ -196,7 +219,7 @@ No critical vulnerabilities identified.
    - Single point of failure in price feeds
    - Mitigation: Implement multiple oracle sources
 
-2. **Front-running in Redemptions** 
+2. **Front-running in Redemptions**
    - MEV extraction possible on large redemptions
    - Mitigation: Add commit-reveal or private mempools
 
@@ -221,18 +244,21 @@ No critical vulnerabilities identified.
 **Lines Covered**: ~850 LOC tested
 
 **Passing Tests**:
+
 - ✅ Full system flow (stake → convert → distribute → redeem)
 - ✅ Oracle staleness prevention
-- ✅ Coverage guard enforcement  
+- ✅ Coverage guard enforcement
 - ✅ Deficit accounting in distributions
 - ✅ Pause functionality across contracts
 - ✅ KYC compliance gating
 
 **Failing Tests**:
+
 - ❌ Soulbound token transfer restrictions
 - ❌ Redemption budget throttling
 
 **Recommendations**:
+
 - Fix failing test cases before production deployment
 - Add fuzzing tests for edge cases
 - Implement invariant testing for economic properties
@@ -241,12 +267,14 @@ No critical vulnerabilities identified.
 ## Gas Optimization Analysis
 
 **Average Gas Costs**:
+
 - Stake operation: ~180,000 gas
-- Convert operation: ~120,000 gas  
+- Convert operation: ~120,000 gas
 - Redemption: ~150,000 gas
 - Distribution: ~100,000 gas per user
 
 **Optimization Opportunities**:
+
 - Pack struct fields to reduce storage slots
 - Use events for historical data instead of mappings
 - Implement batch operations for multiple users
@@ -257,12 +285,14 @@ No critical vulnerabilities identified.
 **Regulatory Alignment**: ✅ **STRONG**
 
 **Securities Law Compliance**:
+
 - Accredited investor verification via KYC
 - Jurisdiction-specific market access controls
 - Proper disclosure through policy manifest
 - Transfer restrictions for compliance
 
 **AML/KYC Framework**:
+
 - Soulbound identity verification
 - Time-based compliance expiry
 - Multi-level investor classification
@@ -271,24 +301,28 @@ No critical vulnerabilities identified.
 ## Recommendations for Production Deployment
 
 ### Critical (Must Fix):
+
 1. Deploy behind multi-signature wallets
 2. Implement multiple oracle price feeds
 3. Add emergency pause coordinator
 4. Fix failing test cases
 
 ### High Priority:
+
 1. Add reentrancy guards across contracts
 2. Implement price deviation circuit breakers
 3. Add slippage protection to ETH flows
 4. Deploy on testnet for 30-day testing period
 
 ### Medium Priority:
+
 1. Add governance token for decentralization
 2. Implement batch processing for gas efficiency
 3. Add invariant testing suite
 4. Set up monitoring and alerting infrastructure
 
 ### Low Priority:
+
 1. Consider proxy patterns for upgrades
 2. Add Dutch auction for large redemptions
 3. Implement MEV protection mechanisms
@@ -301,10 +335,12 @@ The FTH-G smart contract system demonstrates strong security fundamentals with c
 The system is **production-ready** with the implementation of critical security recommendations, particularly around oracle decentralization and emergency response mechanisms. The 85/100 security rating reflects a robust foundation with clear improvement pathways.
 
 **Next Steps**:
+
 1. Address critical oracle centralization
 2. Implement multi-sig governance
 3. Complete comprehensive testnet deployment
 4. Conduct third-party security audit before mainnet
 
 ---
-*This audit represents automated analysis and should be supplemented with professional security audit from firms like Consensys Diligence, Trail of Bits, or OpenZeppelin Security.*
+
+_This audit represents automated analysis and should be supplemented with professional security audit from firms like Consensys Diligence, Trail of Bits, or OpenZeppelin Security._

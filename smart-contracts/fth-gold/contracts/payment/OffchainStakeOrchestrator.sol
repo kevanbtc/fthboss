@@ -29,26 +29,17 @@ contract OffchainStakeOrchestrator is AccessControl {
     mapping(address => bytes32[]) public userStakes;
 
     event ETHQuoteRequested(
-        address indexed user, 
-        uint256 ethAmount, 
-        uint256 expectedUSDT, 
+        address indexed user,
+        uint256 ethAmount,
+        uint256 expectedUSDT,
         uint256 kg,
         bytes32 indexed quoteId,
         uint64 deadline
     );
 
-    event ETHPaymentReceived(
-        address indexed user,
-        uint256 ethAmount,
-        bytes32 indexed quoteId
-    );
+    event ETHPaymentReceived(address indexed user, uint256 ethAmount, bytes32 indexed quoteId);
 
-    event OffchainStakeSettled(
-        address indexed user, 
-        uint256 ethInWei, 
-        uint256 usdtIn, 
-        bytes32 indexed quoteId
-    );
+    event OffchainStakeSettled(address indexed user, uint256 ethInWei, uint256 usdtIn, bytes32 indexed quoteId);
 
     event QuoteExpired(bytes32 indexed quoteId);
 
@@ -56,7 +47,7 @@ contract OffchainStakeOrchestrator is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ORCHESTRATOR_ROLE, admin);
         _grantRole(TREASURER_ROLE, admin);
-        
+
         stakeLocker = _stakeLocker;
         USDT = _usdt;
     }
@@ -67,18 +58,14 @@ contract OffchainStakeOrchestrator is AccessControl {
     /// @param expectedUSDT Expected USDT after conversion (from RFQ)
     /// @param quoteId Unique quote identifier from off-chain RFQ system
     /// @param validFor Quote validity period in seconds
-    function requestETHStake(
-        uint256 kg,
-        uint256 ethAmount,
-        uint256 expectedUSDT,
-        bytes32 quoteId,
-        uint256 validFor
-    ) external {
+    function requestETHStake(uint256 kg, uint256 ethAmount, uint256 expectedUSDT, bytes32 quoteId, uint256 validFor)
+        external
+    {
         require(pendingStakes[quoteId].user == address(0), "Quote already exists");
         require(kg > 0 && ethAmount > 0 && expectedUSDT > 0, "Invalid amounts");
-        
+
         uint64 deadline = uint64(block.timestamp + validFor);
-        
+
         pendingStakes[quoteId] = PendingStake({
             user: msg.sender,
             ethAmount: ethAmount,
@@ -88,9 +75,9 @@ contract OffchainStakeOrchestrator is AccessControl {
             quoteId: quoteId,
             settled: false
         });
-        
+
         userStakes[msg.sender].push(quoteId);
-        
+
         emit ETHQuoteRequested(msg.sender, ethAmount, expectedUSDT, kg, quoteId, deadline);
     }
 
@@ -102,9 +89,9 @@ contract OffchainStakeOrchestrator is AccessControl {
         require(!stake.settled, "Already settled");
         require(block.timestamp <= stake.deadline, "Quote expired");
         require(msg.value == stake.ethAmount, "Incorrect ETH amount");
-        
+
         emit ETHPaymentReceived(msg.sender, msg.value, quoteId);
-        
+
         // ETH is held in contract; off-chain orchestrator will:
         // 1. Detect this event
         // 2. Convert ETH to USDT via DEX/RFQ
@@ -119,19 +106,19 @@ contract OffchainStakeOrchestrator is AccessControl {
         require(stake.user != address(0), "Quote not found");
         require(!stake.settled, "Already settled");
         require(address(this).balance >= stake.ethAmount, "Insufficient ETH balance");
-        
+
         // Mark as settled
         stake.settled = true;
-        
+
         // Transfer USDT from orchestrator to this contract, then to StakeLocker
         require(USDT.transferFrom(msg.sender, address(this), actualUSDT), "USDT transfer failed");
         require(USDT.approve(address(stakeLocker), actualUSDT), "USDT approval failed");
-        
+
         // Execute the actual staking on behalf of the user
         // Note: This requires the StakeLocker to accept staking on behalf of others
         // For now, we'll transfer USDT to the user and emit an event
         require(USDT.transfer(stake.user, actualUSDT), "USDT transfer to user failed");
-        
+
         emit OffchainStakeSettled(stake.user, stake.ethAmount, actualUSDT, quoteId);
     }
 
@@ -142,12 +129,12 @@ contract OffchainStakeOrchestrator is AccessControl {
         require(stake.user != address(0), "Quote not found");
         require(block.timestamp > stake.deadline, "Quote not expired");
         require(!stake.settled, "Already settled");
-        
+
         // Refund ETH if payment was made
         if (address(this).balance >= stake.ethAmount) {
             payable(stake.user).transfer(stake.ethAmount);
         }
-        
+
         stake.settled = true;
         emit QuoteExpired(quoteId);
     }
@@ -176,9 +163,7 @@ contract OffchainStakeOrchestrator is AccessControl {
     /// @return Valid and not settled and not expired
     function isQuoteValid(bytes32 quoteId) external view returns (bool) {
         PendingStake memory stake = pendingStakes[quoteId];
-        return stake.user != address(0) && 
-               !stake.settled && 
-               block.timestamp <= stake.deadline;
+        return stake.user != address(0) && !stake.settled && block.timestamp <= stake.deadline;
     }
 
     receive() external payable {

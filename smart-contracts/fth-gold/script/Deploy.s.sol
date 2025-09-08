@@ -14,7 +14,6 @@ import "../contracts/payment/OffchainStakeOrchestrator.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Deploy is Script {
-    
     struct DeploymentAddresses {
         address admin;
         address usdt;
@@ -33,10 +32,10 @@ contract Deploy is Script {
         // Get deployment parameters from environment or use defaults
         address admin = vm.envOr("ADMIN", msg.sender);
         address usdt = vm.envOr("USDT_ADDRESS", address(0));
-        
+
         // If no USDT address provided, we'll need to deploy a mock (for testing)
         bool deployMockUSDT = usdt == address(0);
-        
+
         vm.startBroadcast();
 
         DeploymentAddresses memory deployed;
@@ -93,48 +92,36 @@ contract Deploy is Script {
         console.log("StakeLocker deployed at:", address(deployed.stakeLocker));
 
         console.log("Deploying Distribution Manager...");
-        deployed.distributionManager = new DistributionManager(
-            IERC20(deployed.usdt),
-            deployed.fthg,
-            deployed.oracle
-        );
+        deployed.distributionManager = new DistributionManager(IERC20(deployed.usdt), deployed.fthg, deployed.oracle);
         console.log("DistributionManager deployed at:", address(deployed.distributionManager));
 
         console.log("Deploying Redemption Desk...");
-        deployed.redemptionDesk = new RedemptionDesk(
-            IERC20(deployed.usdt),
-            deployed.fthg,
-            deployed.oracle
-        );
+        deployed.redemptionDesk = new RedemptionDesk(IERC20(deployed.usdt), deployed.fthg, deployed.oracle);
         console.log("RedemptionDesk deployed at:", address(deployed.redemptionDesk));
 
         console.log("Deploying Offchain Stake Orchestrator...");
-        deployed.orchestrator = new OffchainStakeOrchestrator(
-            admin,
-            deployed.stakeLocker,
-            IERC20(deployed.usdt)
-        );
+        deployed.orchestrator = new OffchainStakeOrchestrator(admin, deployed.stakeLocker, IERC20(deployed.usdt));
         console.log("OffchainStakeOrchestrator deployed at:", address(deployed.orchestrator));
 
         // Setup roles and permissions
         console.log("Setting up roles and permissions...");
-        
+
         // FTHG roles
         deployed.fthg.grantRole(deployed.fthg.MINTER_ROLE(), address(deployed.stakeLocker));
         deployed.fthg.grantRole(deployed.fthg.BURNER_ROLE(), address(deployed.redemptionDesk));
-        
-        // StakeReceipt roles  
+
+        // StakeReceipt roles
         deployed.stakeReceipt.grantRole(deployed.stakeReceipt.ISSUER_ROLE(), address(deployed.stakeLocker));
-        
+
         // DistributionManager roles
         deployed.distributionManager.grantRole(deployed.distributionManager.FUNDER_ROLE(), admin);
 
         // Set initial parameters
         console.log("Setting initial parameters...");
-        
+
         // Set redemption budget (example: $100k daily)
         deployed.redemptionDesk.setDailyBudget(100_000e6);
-        
+
         console.log("=== Deployment Complete ===");
         console.log("");
         console.log("Contract Addresses:");
@@ -148,7 +135,7 @@ contract Deploy is Script {
         console.log("RedemptionDesk:", address(deployed.redemptionDesk));
         console.log("Oracle:", address(deployed.oracle));
         console.log("OffchainStakeOrchestrator:", address(deployed.orchestrator));
-        
+
         console.log("");
         console.log("Next Steps:");
         console.log("1. Configure oracle feeds (replace OracleStub with Chainlink)");
@@ -166,29 +153,34 @@ contract MockUSDT is IERC20 {
     string public name = "Tether USD";
     string public symbol = "USDT";
     uint8 public decimals = 6;
-    
+
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
     uint256 private _totalSupply;
 
-    function totalSupply() external view returns (uint256) { return _totalSupply; }
-    function balanceOf(address account) external view returns (uint256) { return _balances[account]; }
-    
+    function totalSupply() external view returns (uint256) {
+        return _totalSupply;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return _balances[account];
+    }
+
     function transfer(address to, uint256 amount) external returns (bool) {
         _balances[msg.sender] -= amount;
         _balances[to] += amount;
         return true;
     }
-    
-    function allowance(address owner, address spender) external view returns (uint256) { 
-        return _allowances[owner][spender]; 
+
+    function allowance(address owner, address spender) external view returns (uint256) {
+        return _allowances[owner][spender];
     }
-    
+
     function approve(address spender, uint256 amount) external returns (bool) {
         _allowances[msg.sender][spender] = amount;
         return true;
     }
-    
+
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         require(_allowances[from][msg.sender] >= amount, "USDT: allowance exceeded");
         _allowances[from][msg.sender] -= amount;
@@ -196,9 +188,9 @@ contract MockUSDT is IERC20 {
         _balances[to] += amount;
         return true;
     }
-    
-    function mint(address to, uint256 amount) external { 
-        _balances[to] += amount; 
-        _totalSupply += amount; 
+
+    function mint(address to, uint256 amount) external {
+        _balances[to] += amount;
+        _totalSupply += amount;
     }
 }

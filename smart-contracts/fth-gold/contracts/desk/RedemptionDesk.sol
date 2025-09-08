@@ -10,31 +10,31 @@ import {Parameters} from "../config/Parameters.sol";
 
 contract RedemptionDesk is AccessControl {
     IERC20 public immutable USDT;
-    FTHG   public immutable FTH;
+    FTHG public immutable FTH;
     IOracleManager public immutable oracle;
     bool public paused;
 
-    uint256 public dailyBudgetUSDT;     // ops sets per day
-    uint256 public spentTodayUSDT;      // resets daily
+    uint256 public dailyBudgetUSDT; // ops sets per day
+    uint256 public spentTodayUSDT; // resets daily
     uint256 public lastResetDay;
 
     event Redeemed(address indexed user, uint256 kg, uint256 usdtOut, uint256 fee);
     event BudgetSet(uint256 usdtPerDay);
 
-    constructor(IERC20 usdt, FTHG fth, IOracleManager o) { 
-        USDT = usdt; 
-        FTH = fth; 
-        oracle = o; 
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); 
+    constructor(IERC20 usdt, FTHG fth, IOracleManager o) {
+        USDT = usdt;
+        FTH = fth;
+        oracle = o;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function pause(bool p) external onlyRole(DEFAULT_ADMIN_ROLE) { 
-        paused = p; 
+    function pause(bool p) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        paused = p;
     }
 
-    function setDailyBudget(uint256 usd) external onlyRole(DEFAULT_ADMIN_ROLE) { 
-        dailyBudgetUSDT = usd; 
-        emit BudgetSet(usd); 
+    function setDailyBudget(uint256 usd) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        dailyBudgetUSDT = usd;
+        emit BudgetSet(usd);
     }
 
     function redeemKg(uint256 kg) external {
@@ -42,24 +42,27 @@ contract RedemptionDesk is AccessControl {
         _resetIfNewDay();
 
         // oracle checks
-        (uint256 cov, uint256 t1) = oracle.coverageRatioBps(); 
+        (uint256 cov, uint256 t1) = oracle.coverageRatioBps();
         _fresh(t1);
-        if (cov < Parameters.MIN_COVERAGE_BPS) 
+        if (cov < Parameters.MIN_COVERAGE_BPS) {
             revert Errors.CoverageTooLow(cov, Parameters.MIN_COVERAGE_BPS);
+        }
 
-        (uint256 px, uint256 t2) = oracle.xauUsdPrice(); 
+        (uint256 px, uint256 t2) = oracle.xauUsdPrice();
         _fresh(t2);
         // price normalized to 1e8 (XAU per kg) -> map to 6-dec USDT
         uint256 navPerKg = (px / 1e2); // 1e8 -> 1e6
 
         uint256 gross = kg * navPerKg;
-        uint256 fee   = (gross * Parameters.REDEMPTION_FEE_BPS) / 10_000;
-        uint256 net   = gross - fee;
+        uint256 fee = (gross * Parameters.REDEMPTION_FEE_BPS) / 10_000;
+        uint256 net = gross - fee;
 
-        if (spentTodayUSDT + net > dailyBudgetUSDT) 
+        if (spentTodayUSDT + net > dailyBudgetUSDT) {
             revert Errors.InsufficientBudget(net, dailyBudgetUSDT - spentTodayUSDT);
-        if (USDT.balanceOf(address(this)) < net) 
+        }
+        if (USDT.balanceOf(address(this)) < net) {
             revert Errors.InsufficientCash(net, USDT.balanceOf(address(this)));
+        }
 
         // throttle vs supply cap (optional): omitted for brevity; add if you want 5%/day cap by supply
 
@@ -71,15 +74,16 @@ contract RedemptionDesk is AccessControl {
     }
 
     function _fresh(uint256 t) internal view {
-        if (block.timestamp - t > Parameters.ORACLE_STALENESS_MAX) 
+        if (block.timestamp - t > Parameters.ORACLE_STALENESS_MAX) {
             revert Errors.OracleStale(t, Parameters.ORACLE_STALENESS_MAX);
+        }
     }
 
     function _resetIfNewDay() internal {
         uint256 d = block.timestamp / 1 days;
-        if (d != lastResetDay) { 
-            lastResetDay = d; 
-            spentTodayUSDT = 0; 
+        if (d != lastResetDay) {
+            lastResetDay = d;
+            spentTodayUSDT = 0;
         }
     }
 }

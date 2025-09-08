@@ -7,7 +7,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 contract FTHStakeReceipt is ERC20, AccessControl {
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER");
 
-    constructor(address admin) ERC20("FTH Stake Receipt", "FTH-SR") { 
+    constructor(address admin) ERC20("FTH Stake Receipt", "FTH-SR") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ISSUER_ROLE, admin);
     }

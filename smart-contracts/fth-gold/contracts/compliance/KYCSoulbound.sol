@@ -11,9 +11,9 @@ contract KYCSoulbound is ERC721, AccessControl, IKYCSBT {
     struct KYCData {
         bytes32 idHash;
         bytes32 passportHash;
-        uint48 expiry;       // unix time
+        uint48 expiry; // unix time
         uint16 jurisdiction; // enum-coded
-        bool accredited;     // true/false
+        bool accredited; // true/false
     }
 
     mapping(address => KYCData) public kycOf;
@@ -54,12 +54,7 @@ contract KYCSoulbound is ERC721, AccessControl, IKYCSBT {
     }
 
     // Required due to multiple inheritance (ERC165 in both)
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721, AccessControl)
-        returns (bool)
-    {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
         return ERC721.supportsInterface(interfaceId) || AccessControl.supportsInterface(interfaceId);
     }
 

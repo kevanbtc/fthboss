@@ -32,32 +32,25 @@ contract ComplianceRegistry is AccessControl {
     constructor(address admin) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(COMPLIANCE_ADMIN_ROLE, admin);
-        
+
         // Enable UAE/DMCC by default
         marketEnabled[MARKET_UAE_DMCC] = true;
     }
 
-    function setEligibility(
-        address user, 
-        bool kyc, 
-        bytes2 country, 
-        bytes1 investorClass, 
-        uint64 expiry
-    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+    function setEligibility(address user, bool kyc, bytes2 country, bytes1 investorClass, uint64 expiry)
+        external
+        onlyRole(COMPLIANCE_ADMIN_ROLE)
+    {
         Eligibility storage e = _eligibility[user];
         e.kyc = kyc;
         e.country = country;
         e.investorClass = investorClass;
         e.expiry = expiry;
-        
+
         emit EligibilitySet(user, kyc, country, investorClass, expiry);
     }
 
-    function setMarketAccess(
-        address user, 
-        bytes32 marketId, 
-        bool allowed
-    ) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
+    function setMarketAccess(address user, bytes32 marketId, bool allowed) external onlyRole(COMPLIANCE_ADMIN_ROLE) {
         _eligibility[user].marketOK[marketId] = allowed;
         emit MarketAccessSet(user, marketId, allowed);
     }
@@ -69,19 +62,18 @@ contract ComplianceRegistry is AccessControl {
 
     function isEligible(address user, bytes32 marketId) external view returns (bool) {
         if (!marketEnabled[marketId]) return false;
-        
+
         Eligibility storage e = _eligibility[user];
         if (!e.kyc || e.expiry < block.timestamp) return false;
-        
+
         return e.marketOK[marketId];
     }
 
-    function getEligibility(address user) external view returns (
-        bool kyc,
-        bytes2 country,
-        bytes1 investorClass,
-        uint64 expiry
-    ) {
+    function getEligibility(address user)
+        external
+        view
+        returns (bool kyc, bytes2 country, bytes1 investorClass, uint64 expiry)
+    {
         Eligibility storage e = _eligibility[user];
         return (e.kyc, e.country, e.investorClass, e.expiry);
     }

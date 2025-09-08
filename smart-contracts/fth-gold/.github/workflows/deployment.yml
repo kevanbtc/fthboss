@@ -1,0 +1,31 @@
+name: Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: "Network (sepolia|mainnet)"
+        required: true
+        default: "sepolia"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      - name: Configure RPC
+        run: |
+          if [ "${{ github.event.inputs.network }}" = "sepolia" ]; then
+            echo "ETH_RPC_URL=${{ secrets.SEPOLIA_RPC }}" >> $GITHUB_ENV
+            echo "PRIVATE_KEY=${{ secrets.DEPLOYER_KEY }}" >> $GITHUB_ENV
+          else
+            echo "ETH_RPC_URL=${{ secrets.MAINNET_RPC }}" >> $GITHUB_ENV
+            echo "PRIVATE_KEY=${{ secrets.DEPLOYER_KEY }}" >> $GITHUB_ENV
+          fi
+      - name: Deploy
+        run: forge script script/Deploy.s.sol:Deploy --rpc-url $ETH_RPC_URL --broadcast --verify -vvvv
