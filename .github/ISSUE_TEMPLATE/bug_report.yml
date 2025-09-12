@@ -1,0 +1,137 @@
+name: 🐛 Bug Report
+description: Report a bug or issue with FTH-G
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the sections below to help us understand and resolve the issue.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please check these items before submitting
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
+        - label: I have read the documentation and troubleshooting guides
+          required: true
+        - label: This is not a security vulnerability (use SECURITY.md for those)
+          required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component is affected?
+      options:
+        - Smart Contracts
+        - Oracle System
+        - Frontend/UI
+        - API/Backend
+        - Documentation
+        - CI/CD
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this issue?
+      options:
+        - Critical (System unusable, funds at risk)
+        - High (Major functionality broken)
+        - Medium (Some functionality impaired)
+        - Low (Minor issue, workaround available)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug
+      placeholder: Describe what happened and what you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the issue
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: Describe the expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please provide relevant environment details
+      placeholder: |
+        - OS: [e.g. macOS 12.0, Windows 11, Ubuntu 20.04]
+        - Browser: [e.g. Chrome 95, Firefox 94, Safari 15]
+        - Wallet: [e.g. MetaMask 10.5.0, WalletConnect 2.0]
+        - Network: [e.g. Mainnet, Sepolia, Local]
+        - Contract Address: [if applicable]
+        - Transaction Hash: [if applicable]
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Messages/Logs
+      description: Please provide any error messages, console logs, or stack traces
+      render: shell
+      placeholder: Paste error messages or logs here
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here
+      placeholder: |
+        - Screenshots or videos
+        - Additional error details
+        - Related issues or discussions
+        - Attempted workarounds
+
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact
+      description: How does this affect you or other users?
+      options:
+        - label: Blocks my development/testing
+        - label: Affects production usage
+        - label: Potential security implications
+        - label: Affects user experience
+        - label: Documentation issue only

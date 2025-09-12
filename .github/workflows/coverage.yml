@@ -1,0 +1,395 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 12 * * *'  # Daily at noon UTC
+
+jobs:
+  coverage:
+    name: Test Coverage Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Cache Foundry dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          smart-contracts/fth-gold/lib
+          smart-contracts/fth-gold/out
+          smart-contracts/fth-gold/cache
+        key: foundry-coverage-${{ hashFiles('smart-contracts/fth-gold/foundry.toml', 'smart-contracts/fth-gold/foundry.lock') }}
+        restore-keys: |
+          foundry-coverage-
+          foundry-
+
+    - name: Install dependencies
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+
+    - name: Run tests with coverage
+      working-directory: smart-contracts/fth-gold
+      run: |
+        forge coverage \
+          --report lcov \
+          --report summary \
+          --report debug > coverage-summary.txt
+        
+        # Also generate detailed coverage report
+        forge coverage --report lcov > lcov.info
+
+    - name: Generate coverage badges
+      working-directory: smart-contracts/fth-gold
+      run: |
+        # Extract overall coverage percentage
+        coverage_percent=$(grep "Overall test coverage" coverage-summary.txt | grep -oE '[0-9]+\.[0-9]+%' | head -1 | sed 's/%//')
+        
+        if [[ -z "$coverage_percent" ]]; then
+          coverage_percent="0.00"
+        fi
+        
+        echo "Coverage: $coverage_percent%"
+        echo "COVERAGE_PERCENT=$coverage_percent" >> $GITHUB_ENV
+        
+        # Determine badge color
+        if (( $(echo "$coverage_percent >= 90" | bc -l) )); then
+          color="brightgreen"
+        elif (( $(echo "$coverage_percent >= 80" | bc -l) )); then
+          color="green"
+        elif (( $(echo "$coverage_percent >= 70" | bc -l) )); then
+          color="yellow"
+        elif (( $(echo "$coverage_percent >= 60" | bc -l) )); then
+          color="orange"
+        else
+          color="red"
+        fi
+        
+        echo "BADGE_COLOR=$color" >> $GITHUB_ENV
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: smart-contracts/fth-gold/lcov.info
+        flags: smart-contracts
+        name: fth-gold-coverage
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Generate detailed coverage report
+      working-directory: smart-contracts/fth-gold
+      run: |
+        echo "# Test Coverage Report" > coverage-report.md
+        echo "" >> coverage-report.md
+        echo "Generated on: $(date)" >> coverage-report.md
+        echo "" >> coverage-report.md
+        
+        # Overall coverage
+        echo "## Overall Coverage: ${{ env.COVERAGE_PERCENT }}%" >> coverage-report.md
+        echo "" >> coverage-report.md
+        
+        # Add badge
+        echo "![Coverage](https://img.shields.io/badge/coverage-${{ env.COVERAGE_PERCENT }}%25-${{ env.BADGE_COLOR }})" >> coverage-report.md
+        echo "" >> coverage-report.md
+        
+        # Detailed coverage by file
+        echo "## Coverage by File" >> coverage-report.md
+        echo "" >> coverage-report.md
+        
+        if [[ -f lcov.info ]]; then
+          # Parse lcov.info for per-file coverage
+          echo "| File | Lines | Functions | Branches |" >> coverage-report.md
+          echo "|------|-------|-----------|----------|" >> coverage-report.md
+          
+          # This is a simplified parser - in practice you'd want a more robust solution
+          grep -E "^SF:|^LF:|^LH:" lcov.info | \
+          awk '/^SF:/ {file=$0; sub(/^SF:/, "", file)} 
+               /^LF:/ {lines=$0; sub(/^LF:/, "", lines)} 
+               /^LH:/ {hit=$0; sub(/^LH:/, "", hit); 
+                       if(lines > 0) pct = int(hit/lines*100); else pct = 0;
+                       printf "| %s | %s/%s (%d%%) | - | - |\n", file, hit, lines, pct}' >> coverage-report.md
+        fi
+        
+        echo "" >> coverage-report.md
+        echo "## Coverage Requirements" >> coverage-report.md
+        echo "" >> coverage-report.md
+        echo "- **Minimum Overall Coverage**: 80%" >> coverage-report.md
+        echo "- **Minimum Function Coverage**: 90%" >> coverage-report.md
+        echo "- **Critical Path Coverage**: 100%" >> coverage-report.md
+        echo "" >> coverage-report.md
+        
+        # Coverage analysis
+        if (( $(echo "${{ env.COVERAGE_PERCENT }} >= 80" | bc -l) )); then
+          echo "✅ **Status**: Coverage meets minimum requirements" >> coverage-report.md
+        else
+          echo "❌ **Status**: Coverage below minimum threshold (80%)" >> coverage-report.md
+        fi
+
+    - name: Check coverage thresholds
+      working-directory: smart-contracts/fth-gold
+      run: |
+        coverage_percent="${{ env.COVERAGE_PERCENT }}"
+        
+        echo "Checking coverage thresholds..."
+        echo "Current coverage: $coverage_percent%"
+        
+        # Set thresholds
+        minimum_coverage=80
+        warning_coverage=90
+        
+        if (( $(echo "$coverage_percent < $minimum_coverage" | bc -l) )); then
+          echo "❌ Coverage $coverage_percent% is below minimum threshold of $minimum_coverage%"
+          echo "COVERAGE_CHECK=fail" >> $GITHUB_ENV
+          exit 1
+        elif (( $(echo "$coverage_percent < $warning_coverage" | bc -l) )); then
+          echo "⚠️  Coverage $coverage_percent% is below recommended threshold of $warning_coverage%"
+          echo "COVERAGE_CHECK=warning" >> $GITHUB_ENV
+        else
+          echo "✅ Coverage $coverage_percent% meets all thresholds"
+          echo "COVERAGE_CHECK=pass" >> $GITHUB_ENV
+        fi
+
+    - name: Comment coverage on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const path = 'smart-contracts/fth-gold/coverage-report.md';
+          
+          if (fs.existsSync(path)) {
+            const coverage = fs.readFileSync(path, 'utf8');
+            const coveragePercent = process.env.COVERAGE_PERCENT;
+            const checkStatus = process.env.COVERAGE_CHECK;
+            
+            let emoji = '✅';
+            if (checkStatus === 'warning') emoji = '⚠️';
+            if (checkStatus === 'fail') emoji = '❌';
+            
+            const comment = `## ${emoji} Test Coverage Report
+            
+**Current Coverage**: ${coveragePercent}%
+
+${coverage}
+
+---
+*This comment was automatically generated by the test coverage workflow.*`;
+
+            // Check if we already commented
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(comment => 
+              comment.body.includes('Test Coverage Report'));
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+          }
+
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-report
+        path: |
+          smart-contracts/fth-gold/coverage-report.md
+          smart-contracts/fth-gold/coverage-summary.txt
+          smart-contracts/fth-gold/lcov.info
+
+  coverage-diff:
+    name: Coverage Comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+    needs: coverage
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+
+    - name: Get base branch coverage
+      run: |
+        git checkout ${{ github.base_ref }}
+        cd smart-contracts/fth-gold
+        
+        # Install dependencies for base branch
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+        
+        # Get base coverage
+        if forge coverage --report summary > base-coverage.txt 2>/dev/null; then
+          base_coverage=$(grep "Overall test coverage" base-coverage.txt | grep -oE '[0-9]+\.[0-9]+%' | head -1 | sed 's/%//')
+          if [[ -z "$base_coverage" ]]; then
+            base_coverage="0.00"
+          fi
+        else
+          base_coverage="0.00"
+        fi
+        
+        echo "BASE_COVERAGE=$base_coverage" >> $GITHUB_ENV
+        echo "Base branch coverage: $base_coverage%"
+
+    - name: Get current branch coverage
+      run: |
+        git checkout ${{ github.head_ref }}
+        cd smart-contracts/fth-gold
+        
+        # Install dependencies for current branch
+        forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+        forge install --no-commit
+        
+        # Get current coverage
+        if forge coverage --report summary > current-coverage.txt 2>/dev/null; then
+          current_coverage=$(grep "Overall test coverage" current-coverage.txt | grep -oE '[0-9]+\.[0-9]+%' | head -1 | sed 's/%//')
+          if [[ -z "$current_coverage" ]]; then
+            current_coverage="0.00"
+          fi
+        else
+          current_coverage="0.00"
+        fi
+        
+        echo "CURRENT_COVERAGE=$current_coverage" >> $GITHUB_ENV
+        echo "Current branch coverage: $current_coverage%"
+
+    - name: Calculate coverage difference
+      run: |
+        base_coverage="${{ env.BASE_COVERAGE }}"
+        current_coverage="${{ env.CURRENT_COVERAGE }}"
+        
+        # Calculate difference
+        diff=$(echo "$current_coverage - $base_coverage" | bc -l)
+        
+        echo "COVERAGE_DIFF=$diff" >> $GITHUB_ENV
+        echo "Coverage difference: $diff%"
+        
+        # Determine status
+        if (( $(echo "$diff > 0" | bc -l) )); then
+          echo "DIFF_STATUS=improved" >> $GITHUB_ENV
+          echo "DIFF_EMOJI=📈" >> $GITHUB_ENV
+        elif (( $(echo "$diff < 0" | bc -l) )); then
+          echo "DIFF_STATUS=decreased" >> $GITHUB_ENV
+          echo "DIFF_EMOJI=📉" >> $GITHUB_ENV
+        else
+          echo "DIFF_STATUS=unchanged" >> $GITHUB_ENV
+          echo "DIFF_EMOJI=➡️" >> $GITHUB_ENV
+        fi
+
+    - name: Comment coverage diff on PR
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const baseCoverage = process.env.BASE_COVERAGE;
+          const currentCoverage = process.env.CURRENT_COVERAGE;
+          const diff = process.env.COVERAGE_DIFF;
+          const status = process.env.DIFF_STATUS;
+          const emoji = process.env.DIFF_EMOJI;
+          
+          const comment = `## ${emoji} Coverage Comparison
+          
+| Branch | Coverage | Change |
+|--------|----------|--------|
+| **${{ github.base_ref }}** (base) | ${baseCoverage}% | - |
+| **${{ github.head_ref }}** (current) | ${currentCoverage}% | ${diff > 0 ? '+' : ''}${diff}% |
+
+**Status**: Coverage has ${status}
+
+---
+*Coverage comparison generated automatically.*`;
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: comment
+          });
+
+  historical-coverage:
+    name: Historical Coverage Tracking
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+    needs: coverage
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Update coverage history
+      run: |
+        # Create coverage history file if it doesn't exist
+        mkdir -p .github/coverage-history
+        history_file=".github/coverage-history/coverage.json"
+        
+        if [[ ! -f "$history_file" ]]; then
+          echo "[]" > "$history_file"
+        fi
+        
+        # Add current coverage to history
+        current_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        coverage_percent="${{ env.COVERAGE_PERCENT }}"
+        commit_sha="${{ github.sha }}"
+        
+        # Use jq to add the new entry
+        jq --arg date "$current_date" \
+           --arg coverage "$coverage_percent" \
+           --arg commit "$commit_sha" \
+           '. += [{"date": $date, "coverage": $coverage, "commit": $commit}]' \
+           "$history_file" > "${history_file}.tmp" && mv "${history_file}.tmp" "$history_file"
+
+    - name: Commit coverage history
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        git add .github/coverage-history/
+        
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update coverage history: ${{ env.COVERAGE_PERCENT }}%"
+          git push
+        fi

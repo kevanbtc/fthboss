@@ -1,0 +1,108 @@
+name: 🔒 Security Issue
+description: Report a security vulnerability (use for non-critical issues only)
+title: "[SECURITY] "
+labels: ["security", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **IMPORTANT SECURITY NOTICE** ⚠️
+        
+        If this is a **CRITICAL** security vulnerability that could result in loss of funds, 
+        unauthorized access, or compromise of user data, please **DO NOT** use this form.
+        
+        Instead, email us directly at: **security@fthboss.com**
+        
+        Use this form only for:
+        - Non-critical security improvements
+        - Security documentation issues
+        - Security tooling requests
+        - General security questions
+
+  - type: checkboxes
+    id: severity-check
+    attributes:
+      label: Severity Confirmation
+      description: Please confirm this is NOT a critical issue
+      options:
+        - label: This is NOT a critical vulnerability that could result in fund loss
+          required: true
+        - label: This is NOT an issue that requires immediate attention
+          required: true
+        - label: I understand that critical issues should be reported via email
+          required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Security Issue Type
+      description: What type of security issue is this?
+      options:
+        - Security Documentation
+        - Security Tooling Request
+        - Security Best Practices
+        - Non-critical Security Improvement
+        - Security Question
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the security concern or suggestion
+      placeholder: |
+        Provide a clear description of:
+        - What the security concern is
+        - Why it's important to address
+        - How it could be improved
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Potential Impact
+      description: What could happen if this isn't addressed?
+      placeholder: |
+        Describe the potential security implications:
+        - What assets or data could be affected
+        - What actions an attacker might take
+        - How likely this scenario is
+
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommended Action
+      description: What do you suggest should be done?
+      placeholder: |
+        Provide specific recommendations:
+        - Security improvements to implement
+        - Documentation to add or update
+        - Tools to integrate
+        - Processes to establish
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other relevant information
+      placeholder: |
+        - Related security standards or guidelines
+        - Examples from other projects
+        - Relevant security research or articles
+        - Screenshots or diagrams if helpful
+
+  - type: checkboxes
+    id: responsible-disclosure
+    attributes:
+      label: Responsible Disclosure Commitment
+      description: Please confirm your commitment to responsible disclosure
+      options:
+        - label: I will not publicly disclose details until given permission
+          required: true
+        - label: I will not exploit any vulnerabilities I discover
+          required: true
+        - label: I will follow the project's security guidelines
+          required: true

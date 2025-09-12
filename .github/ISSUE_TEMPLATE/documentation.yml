@@ -1,0 +1,130 @@
+name: 📚 Documentation Issue
+description: Report an issue with documentation or suggest improvements
+title: "[DOCS] "
+labels: ["documentation", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve our documentation! Clear and accurate docs are essential for the success of FTH-G.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation issue is this?
+      options:
+        - Incorrect Information
+        - Missing Documentation
+        - Unclear Instructions
+        - Outdated Content
+        - Formatting/Style Issue
+        - Translation Issue
+        - Accessibility Issue
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Documentation Category
+      description: Which area of documentation is affected?
+      options:
+        - README
+        - Getting Started Guide
+        - Smart Contract Documentation
+        - API Documentation
+        - Security Documentation
+        - Contributing Guidelines
+        - Troubleshooting
+        - Examples/Tutorials
+        - Architecture Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Where is the problematic documentation located?
+      placeholder: |
+        Please provide:
+        - Specific file path or URL
+        - Section heading or line numbers
+        - Link to the documentation page
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-content
+    attributes:
+      label: Current Content
+      description: What does the documentation currently say?
+      placeholder: |
+        Quote the current text that needs to be fixed or improved.
+        This helps us locate the exact content you're referring to.
+
+  - type: textarea
+    id: issue-description
+    attributes:
+      label: Issue Description
+      description: What's wrong with the current documentation?
+      placeholder: |
+        Describe the problem clearly:
+        - Is information incorrect or misleading?
+        - Are steps missing or unclear?
+        - Is content outdated?
+        - Are there formatting issues?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested-improvement
+    attributes:
+      label: Suggested Improvement
+      description: How should the documentation be improved?
+      placeholder: |
+        Provide specific suggestions:
+        - Corrected information
+        - Additional content to include
+        - Better explanations or examples
+        - Improved formatting or structure
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-impact
+    attributes:
+      label: User Impact
+      description: How does this documentation issue affect users?
+      placeholder: |
+        Explain the impact:
+        - Does it prevent users from getting started?
+        - Does it lead to confusion or errors?
+        - Does it affect specific user groups?
+        - How critical is this issue?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other relevant information
+      placeholder: |
+        - Your experience level with the project
+        - What you were trying to accomplish
+        - Screenshots of formatting issues
+        - Links to related documentation
+        - Examples of good documentation from other projects
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution Offer
+      description: Would you like to help fix this documentation issue?
+      options:
+        - label: I can help write the improved content
+        - label: I can help review proposed changes
+        - label: I can help with testing the updated documentation
+        - label: I can provide examples or use cases
